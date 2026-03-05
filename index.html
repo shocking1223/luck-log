@@ -423,6 +423,14 @@ ${mini.join("\n")}
     if (!/^\d{4}$/.test(s)) { showToast("4桁の数字で！"); return; }
     saveN4(s);
     renderHome();
+    {
+  "game": "miniloto",
+  "round": "",
+  "draw_date": "",
+  "main": ["00","00","00","00","00"],
+  "bonus": "00",
+  "updated_at": ""
+}
     showToast("N4を保存した");
   }
 
@@ -451,6 +459,7 @@ ${mini.join("\n")}
 </script>
 </body>
 </html>
+
 
 
 
