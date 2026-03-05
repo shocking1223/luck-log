@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#111111" />
+  <title>将一くじログ</title>
+
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <style>
+    body { font-family:-apple-system,system-ui,"Noto Sans JP",sans-serif; margin:0; background:#0b0b0b; color:#f5f5f5; }
+    header { padding:14px 16px; background:#111; border-bottom:1px solid #222; position:sticky; top:0; }
+    h1 { margin:0; font-size:16px; }
+    main { padding:16px; max-width:900px; margin:0 auto; }
+    .card { background:#121212; border:1px solid #222; border-radius:12px; padding:12px; margin-bottom:12px; }
+    button { width:100%; padding:12px; border-radius:12px; border:1px solid #2f2f2f; background:#1a1a1a; color:#fff; font-weight:800; cursor:pointer; }
+    button + button { margin-top:10px; }
+    .muted { opacity:.75; font-size:12px; margin-top:6px; line-height:1.4; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { border-bottom:1px solid #222; padding:10px 6px; text-align:left; vertical-align:top; }
+    .right { text-align:right; }
+    .tabs { display:flex; gap:8px; flex-wrap:wrap; }
+    .tabs button { width:auto; padding:8px 10px; font-weight:700; }
+    .primary { background:#2b2b2b; border-color:#3a3a3a; }
+    .kpis { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+    .kpi { padding:10px; border-radius:10px; border:1px solid #222; background:#0e0e0e; }
+    .kpi .t { opacity:.75; font-size:12px; }
+    .kpi .v { font-size:18px; font-weight:900; margin-top:4px; }
+    @media (max-width:720px){ .kpis{grid-template-columns:1fr;} }
+  </style>
+</head>
+
+<body>
+<header>
+  <h1>将一くじログ <span class="muted">（俺だけ用）</span></h1>
+</header>
+
+<main>
+  <div class="card">
+    <div style="font-weight:900; margin-bottom:8px;">今日やること</div>
+    <button id="addN4">N4 今日分を保存（1232 + 9941）</button>
+    <button id="addMini">ミニロト 今週5組を保存</button>
+    <div class="muted">
+      ・購入金額は自動（1口=200円）<br>
+      ・当選金額はあとから入力（ハズレは0）
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button id="tabAll" class="primary">履歴</button>
+      <button id="tabWins">当選ログ</button>
+      <button id="tabStats">成績</button>
+      <button id="tabBackup">バックアップ</button>
+    </div>
+    <div class="muted" style="margin-top:8px;">※データは端末内に保存。機種変に備えてたまにバックアップ推奨。</div>
+  </div>
+
+  <div class="card" id="listCard">
+    <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
+      <div id="listTitle" style="font-weight:900;">履歴</div>
+      <div id="countLabel" class="muted"></div>
+    </div>
+    <div style="overflow:auto; margin-top:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>種類</th>
+            <th>内容</th>
+            <th class="right">購入</th>
+            <th class="right">当選</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="statsCard" style="display:none;">
+    <div style="font-weight:900; margin-bottom:10px;">成績（自動）</div>
+    <div class="kpis" id="kpis"></div>
+    <div class="muted" style="margin-top:10px;">回収率＝当選合計 ÷ 購入合計 × 100</div>
+  </div>
+
+  <div class="card" id="backupCard" style="display:none;">
+    <div style="font-weight:900; margin-bottom:10px;">バックアップ</div>
+    <button id="exportBtn" class="primary">エクスポート（JSON保存）</button>
+    <div style="margin-top:10px;">
+      <input id="importFile" type="file" accept="application/json" />
+    </div>
+    <div class="muted" style="margin-top:10px;">インポートすると端末内のデータを復元できる。</div>
+    <button id="clearBtn" style="margin-top:10px;">全データ削除（注意）</button>
+  </div>
+</main>
+
+<script>
+  // ========= 将一固定 =========
+  const PRICE = 200;
+  const N4_NUMBERS = ["1232", "9941"];
+  const MINI_SETS = [
+    "03/06/11/20/27",
+    "03/12/16/25/31",
+    "06/11/20/28/31",
+    "03/16/25/27/28",
+    "11/16/20/25/28"
+  ];
+
+  // ========= 保存 =========
+  const KEY = "shoi_lucklog_v1";
+
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } }
+  function saveAll(items){ localStorage.setItem(KEY, JSON.stringify(items)); }
+  function yen(n){ return "¥" + (Number(n)||0).toLocaleString("ja-JP"); }
+  function pct(win,buy){
+    buy = Number(buy)||0; win = Number(win)||0;
+    if (buy<=0) return "0.0%";
+    return (win/buy*100).toFixed(1) + "%";
+  }
+  function todayISO(){
+    const d=new Date(); const y=d.getFullYear();
+    const m=String(d.getMonth()+1).padStart(2,"0");
+    const day=String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  }
+  function id(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  // ========= 追加ボタン =========
+  document.getElementById("addN4").addEventListener("click", () => {
+    const date = todayISO();
+    const units = 1; // 将一の基本は1口想定（増やすなら後で拡張）
+    const buy = units * PRICE;
+
+    const items = load();
+    // 2行追加（1232 / 9941）
+    for (const num of [...N4_NUMBERS].reverse()){
+      items.unshift({ id:id(), date, type:"N4", detail:num, units, buy, win:0, createdAt:Date.now() });
+    }
+    saveAll(items);
+    render();
+    alert("OK！N4（1232+9941）を保存した👍");
+  });
+
+  document.getElementById("addMini").addEventListener("click", () => {
+    const date = todayISO();
+    const units = 1;
+    const buy = units * PRICE;
+
+    const items = load();
+    // 5行追加（5組）
+    for (let i=MINI_SETS.length-1; i>=0; i--){
+      items.unshift({ id:id(), date, type:"MINI", detail:`${i+1}組 ${MINI_SETS[i]}`, units, buy, win:0, createdAt:Date.now() });
+    }
+    saveAll(items);
+    render();
+    alert("OK！ミニロト5組を保存した👍");
+  });
+
+  // ========= タブ =========
+  const tabAll = document.getElementById("tabAll");
+  const tabWins = document.getElementById("tabWins");
+  const tabStats = document.getElementById("tabStats");
+  const tabBackup = document.getElementById("tabBackup");
+
+  const listCard = document.getElementById("listCard");
+  const statsCard = document.getElementById("statsCard");
+  const backupCard = document.getElementById("backupCard");
+  const listTitle = document.getElementById("listTitle");
+
+  let view = "all"; // all / wins
+
+  function setActive(btn){
+    [tabAll,tabWins,tabStats,tabBackup].forEach(b=>b.classList.remove("primary"));
+    btn.classList.add("primary");
+  }
+
+  tabAll.onclick = () => {
+    view="all"; setActive(tabAll);
+    listCard.style.display=""; statsCard.style.display="none"; backupCard.style.display="none";
+    listTitle.textContent="履歴";
+    render();
+  };
+  tabWins.onclick = () => {
+    view="wins"; setActive(tabWins);
+    listCard.style.display=""; statsCard.style.display="none"; backupCard.style.display="none";
+    listTitle.textContent="当選ログ（当選 > 0）";
+    render();
+  };
+  tabStats.onclick = () => {
+    setActive(tabStats);
+    listCard.style.display="none"; statsCard.style.display=""; backupCard.style.display="none";
+    renderStats();
+  };
+  tabBackup.onclick = () => {
+    setActive(tabBackup);
+    listCard.style.display="none"; statsCard.style.display="none"; backupCard.style.display="";
+  };
+
+  // ========= 表 =========
+  const tbody = document.getElementById("tbody");
+  const countLabel = document.getElementById("countLabel");
+
+  function render(){
+    const items = load();
+    const filtered = (view==="wins") ? items.filter(x=>(Number(x.win)||0)>0) : items;
+    countLabel.textContent = `${filtered.length}件`;
+
+    tbody.innerHTML="";
+    for (const x of filtered){
+      const tr = document.createElement("tr");
+      const typeLabel = x.type==="N4" ? "N4" : "ミニロト";
+      tr.innerHTML = `
+        <td>${x.date}</td>
+        <td>${typeLabel}</td>
+        <td>${escapeHtml(x.detail)}</td>
+        <td class="right">${yen(x.buy)}</td>
+        <td class="right">${yen(x.win)}</td>
+        <td>
+          <button data-edit="${x.id}" style="width:auto; padding:8px 10px;">当選入力</button>
+          <button data-del="${x.id}" style="width:auto; padding:8px 10px; margin-left:6px;">削除</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    document.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.onclick=()=>{
+        const idv = btn.getAttribute("data-del");
+        saveAll(load().filter(x=>x.id!==idv));
+        render();
+      };
+    });
+
+    document.querySelectorAll("[data-edit]").forEach(btn=>{
+      btn.onclick=()=>{
+        const idv = btn.getAttribute("data-edit");
+        const items = load();
+        const t = items.find(x=>x.id===idv);
+        if (!t) return;
+        const v = prompt("当選金額（円）を入力", String(Number(t.win)||0));
+        if (v===null) return;
+        t.win = Math.max(0, Number(v)||0);
+        saveAll(items);
+        render();
+      };
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  }
+
+  // ========= 成績 =========
+  function renderStats(){
+    const items = load();
+    const sum = arr => arr.reduce((a,n)=>a+(Number(n)||0),0);
+
+    const n4 = items.filter(x=>x.type==="N4");
+    const mini = items.filter(x=>x.type==="MINI");
+
+    const n4Buy = sum(n4.map(x=>x.buy));
+    const n4Win = sum(n4.map(x=>x.win));
+    const mBuy = sum(mini.map(x=>x.buy));
+    const mWin = sum(mini.map(x=>x.win));
+
+    const tBuy = n4Buy + mBuy;
+    const tWin = n4Win + mWin;
+
+    const blocks = [
+      { title:"ナンバーズ4", buy:n4Buy, win:n4Win },
+      { title:"ミニロト", buy:mBuy, win:mWin },
+      { title:"TOTAL", buy:tBuy, win:tWin }
+    ];
+
+    const kpis = document.getElementById("kpis");
+    kpis.innerHTML="";
+    for (const b of blocks){
+      const div = document.createElement("div");
+      div.className="kpi";
+      div.innerHTML = `
+        <div class="t">${b.title}</div>
+        <div class="v">${pct(b.win,b.buy)}</div>
+        <div class="t">購入：${yen(b.buy)} / 当選：${yen(b.win)}</div>
+      `;
+      kpis.appendChild(div);
+    }
+  }
+
+  // ========= バックアップ =========
+  document.getElementById("exportBtn").onclick = () => {
+    const data = localStorage.getItem(KEY) || "[]";
+    const blob = new Blob([data], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shoi-lucklog-${todayISO()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  document.getElementById("importFile").addEventListener("change", async (e)=>{
+    const f = e.target.files?.[0]; if (!f) return;
+    const text = await f.text();
+    try{
+      const arr = JSON.parse(text);
+      if (!Array.isArray(arr)) throw new Error("bad");
+      saveAll(arr);
+      alert("復元OK！");
+      render();
+    }catch{
+      alert("ごめん、ファイル形式が違うっぽい…");
+    }
+  });
+
+  document.getElementById("clearBtn").onclick = () => {
+    if (confirm("全データ削除する？（戻せない）")){
+      localStorage.removeItem(KEY);
+      render();
+      alert("消した！また一から行こう👍");
+    }
+  };
+
+  // 初回
+  render();
+</script>
+</body>
+</html>
