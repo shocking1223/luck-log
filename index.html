@@ -320,8 +320,18 @@
   const loadN4 = () => {
   const raw = localStorage.getItem(KEY_N4);
   if (!raw) return DEFAULT_N4;
+
+  // 旧データ救済： "1232" だけ入ってたら 2口に拡張
+  if (/^\d{4}$/.test(raw)) return [raw, "9941"];
+
   try {
-    return JSON.parse(raw);
+    const v = JSON.parse(raw);
+    // 配列じゃなかったら初期値
+    if (!Array.isArray(v)) return DEFAULT_N4;
+    // 1個しかなければ2個に拡張
+    if (v.length === 1) return [v[0], "9941"];
+    // 2個以上なら先頭2個だけ使う
+    return [v[0], v[1]];
   } catch {
     return DEFAULT_N4;
   }
@@ -344,8 +354,8 @@
     const first = parseNums(mini[0] || DEFAULT_MINI[0]);
     demoNumEls.forEach((el, i) => el.textContent = first[i] || "--");
 
-    const n4 = loadN4();
-    if (n4Bold) n4Bold.textContent = n4;
+const n4 = loadN4();
+if (n4Bold) n4Bold.textContent = `${n4[0]} / ${n4[1]}`;
   }
 
   renderHome();
@@ -441,6 +451,7 @@ ${mini.join("\n")}
 </script>
 </body>
 </html>
+
 
 
 
