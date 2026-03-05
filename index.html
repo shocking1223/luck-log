@@ -273,7 +273,7 @@
     "03 16 25 27 28",
     "11 16 20 25 28"
   ];
-  const DEFAULT_N4 = "1232";
+  const DEFAULT_N4 = ["1232","9941"];
 
   const KEY_MINI = "takara_mini5";
   const KEY_N4   = "takara_n4";
@@ -316,8 +316,16 @@
     } catch { return DEFAULT_MINI; }
   };
 
-  const saveN4 = (v) => localStorage.setItem(KEY_N4, v);
-  const loadN4 = () => (localStorage.getItem(KEY_N4) || DEFAULT_N4);
+  const saveN4 = (v) => localStorage.setItem(KEY_N4, JSON.stringify(v));
+  const loadN4 = () => {
+  const raw = localStorage.getItem(KEY_N4);
+  if (!raw) return DEFAULT_N4;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return DEFAULT_N4;
+  }
+};
 
   // ====== カウントダウン（ミニロト：火曜）======
   function calcDaysToNextTuesday(){
@@ -433,5 +441,6 @@ ${mini.join("\n")}
 </script>
 </body>
 </html>
+
 
 
