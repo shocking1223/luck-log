@@ -343,11 +343,27 @@
   renderHome();
 
   // ====== CHECKボタン（まずは保存データを見せる）======
-  document.getElementById('btnCheck').addEventListener('click', () => {
-    const mini = loadMini();
-    const n4 = loadN4();
-    showToast(`保存済み：ミニロト5組 / N4=${n4}（次は当選番号と照合を入れる）`);
+ document.getElementById('btnCheck').addEventListener('click', () => {
+  const mini = loadMini();
+  const input = prompt("ミニロト 当選番号を入力（5数字・スペース区切り）\n例：03 11 20 25 28");
+  if (input === null) return;
+
+  const win = input.trim().split(/\s+/).map(x => x.padStart(2,"0"));
+  if (win.length !== 5) {
+    showToast("当選番号は5個！");
+    return;
+  }
+
+  const winSet = new Set(win);
+
+  const result = mini.map((line, i) => {
+    const nums = line.split(" ");
+    const hit = nums.filter(n => winSet.has(n)).length;
+    return `${i+1}組 ${nums.join(" ")} → ${hit}個一致`;
   });
+
+  alert("当選番号\n" + win.join(" ") + "\n\n結果\n" + result.join("\n"));
+});
 
   // ====== 買い目編集（超シンプル：promptで編集）======
   // nav「買い目」を押したら、5行入力できるようにする（スペース区切り）
@@ -417,4 +433,5 @@ ${mini.join("\n")}
 </script>
 </body>
 </html>
+
 
