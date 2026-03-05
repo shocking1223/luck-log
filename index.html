@@ -264,51 +264,157 @@
     </div>
   </div>
 
-  <script>
-    // --- 小ネタ：次の抽選まで（デモ） ---
-    // ミニロトは毎週火曜。今日から次の火曜までの日数をざっくり出す。
-    const countdownEl = document.getElementById('countdown');
-    function calcDaysToNextTuesday(){
-      const now = new Date();
-      const day = now.getDay(); // 0=日..2=火
-      const target = 2;
-      let diff = (target - day + 7) % 7;
-      if(diff === 0) diff = 7;
-      return diff;
+<script>
+  // ====== 設定（初期値）======
+  const DEFAULT_MINI = [
+    "03 06 11 20 27",
+    "03 12 16 25 31",
+    "06 11 20 28 31",
+    "03 16 25 27 28",
+    "11 16 20 25 28"
+  ];
+  const DEFAULT_N4 = "1232";
+
+  const KEY_MINI = "takara_mini5";
+  const KEY_N4   = "takara_n4";
+
+  // ====== 既存HTMLから要素を拾う（この画面のまま活かす）======
+  const toast = document.getElementById('toast');
+  const countdownEl = document.getElementById('countdown');
+
+  // HOMEのデモ数字（03 06 11 20 27）を「保存データの1組目」で置き換える
+  const demoNumEls = Array.from(document.querySelectorAll('.nums .n'));
+
+  // いまは固定表示の「1232」をHTMLに直書きしてるので、後で差し替えしやすいように探す
+  // （この画面では gold文字の <b>1232</b> が1個しかない想定）
+  const n4Bold = Array.from(document.querySelectorAll('.pill b')).find(b => b.textContent.trim() === "1232") 
+               || Array.from(document.querySelectorAll('.pill b'))[1];
+
+  // ナビ
+  const navBtns = [
+    document.getElementById('navHome'),
+    document.getElementById('navTickets'),
+    document.getElementById('navStats')
+  ];
+
+  // ====== ユーティリティ ======
+  const showToast = (msg) => {
+    toast.style.display = 'block';
+    toast.textContent = msg;
+    setTimeout(()=> toast.style.display='none', 2200);
+  };
+
+  const parseNums = (line) => line.trim().split(/\s+/).map(x => x.padStart(2,"0"));
+
+  const saveMini = (arr5) => localStorage.setItem(KEY_MINI, JSON.stringify(arr5));
+  const loadMini = () => {
+    const raw = localStorage.getItem(KEY_MINI);
+    if (!raw) return DEFAULT_MINI;
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) && v.length ? v : DEFAULT_MINI;
+    } catch { return DEFAULT_MINI; }
+  };
+
+  const saveN4 = (v) => localStorage.setItem(KEY_N4, v);
+  const loadN4 = () => (localStorage.getItem(KEY_N4) || DEFAULT_N4);
+
+  // ====== カウントダウン（ミニロト：火曜）======
+  function calcDaysToNextTuesday(){
+    const now = new Date();
+    const day = now.getDay(); // 0=日..2=火
+    const target = 2;
+    let diff = (target - day + 7) % 7;
+    if(diff === 0) diff = 7;
+    return diff;
+  }
+  countdownEl.textContent = `あと ${calcDaysToNextTuesday()} 日`;
+
+  // ====== 表示反映 ======
+  function renderHome(){
+    const mini = loadMini();
+    const first = parseNums(mini[0] || DEFAULT_MINI[0]);
+    demoNumEls.forEach((el, i) => el.textContent = first[i] || "--");
+
+    const n4 = loadN4();
+    if (n4Bold) n4Bold.textContent = n4;
+  }
+
+  renderHome();
+
+  // ====== CHECKボタン（まずは保存データを見せる）======
+  document.getElementById('btnCheck').addEventListener('click', () => {
+    const mini = loadMini();
+    const n4 = loadN4();
+    showToast(`保存済み：ミニロト5組 / N4=${n4}（次は当選番号と照合を入れる）`);
+  });
+
+  // ====== 買い目編集（超シンプル：promptで編集）======
+  // nav「買い目」を押したら、5行入力できるようにする（スペース区切り）
+  function editTickets(){
+    const mini = loadMini();
+    const input = prompt(
+`ミニロト 5組を入力（1行=5数字、スペース区切り）
+例：
+03 06 11 20 27
+03 12 16 25 31
+...
+
+現在：
+${mini.join("\n")}
+
+キャンセルで変更なし`, mini.join("\n")
+    );
+    if (input === null) return;
+
+    const lines = input.split("\n").map(s => s.trim()).filter(Boolean);
+    if (lines.length !== 5) {
+      showToast("5行にしてね（5組）");
+      return;
     }
-    countdownEl.textContent = `あと ${calcDaysToNextTuesday()} 日`;
-
-    // --- ボタン操作（デモ） ---
-    const toast = document.getElementById('toast');
-    document.getElementById('btnCheck').addEventListener('click', () => {
-      toast.style.display = 'block';
-      toast.textContent = 'チェック（デモ）: 次は抽選結果を自動取得して照合する。';
-      setTimeout(()=> toast.style.display='none', 2200);
-    });
-
-    // ナビは今は見た目だけ
-    const navBtns = [
-      document.getElementById('navHome'),
-      document.getElementById('navTickets'),
-      document.getElementById('navStats')
-    ];
-    navBtns.forEach(btn => btn.addEventListener('click', () => {
-      navBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      // デモ：トーストで次に作る機能を出す
-      toast.style.display = 'block';
-      toast.textContent = btn.id === 'navTickets'
-        ? '買い目画面（次に実装）: 5組・2組を保存して編集できるようにする。'
-        : btn.id === 'navStats'
-          ? '戦績画面（次に実装）: 総投資/総回収/回収率/当選回数を出す。'
-          : 'HOME: まずは見た目完成。次は当選結果の自動取得へ。';
-      setTimeout(()=> toast.style.display='none', 2400);
-    }));
-
-    // Service Worker（あるなら）
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    for (const ln of lines) {
+      const nums = ln.split(/\s+/);
+      if (nums.length !== 5) { showToast("1行は5数字にしてね"); return; }
     }
-  </script>
+    saveMini(lines.map(l => l.replace(/\s+/g, " ")));
+    renderHome();
+    showToast("ミニロト5組を保存した");
+  }
+
+  function editN4(){
+    const current = loadN4();
+    const v = prompt("Numbers4 固定番号（4桁）を入力", current);
+    if (v === null) return;
+    const s = String(v).trim();
+    if (!/^\d{4}$/.test(s)) { showToast("4桁の数字で！"); return; }
+    saveN4(s);
+    renderHome();
+    showToast("N4を保存した");
+  }
+
+  // navの挙動（HOME/買い目/戦績）
+  navBtns.forEach(btn => btn.addEventListener('click', () => {
+    navBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (btn.id === 'navTickets') {
+      // まずミニロト編集→続けてN4編集
+      editTickets();
+      editN4();
+      return;
+    }
+    if (btn.id === 'navStats') {
+      showToast("戦績（次に実装）：総投資/総回収/回収率/当選回数");
+      return;
+    }
+    showToast("HOME：保存した買い目が表示される");
+  }));
+
+  // Service Worker（あるなら）
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+</script>
 </body>
 </html>
+
