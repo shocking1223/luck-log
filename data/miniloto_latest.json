@@ -1,8 +1,8 @@
 {
   "game": "miniloto",
-  "round": "",
-  "draw_date": "",
-  "main": ["00","00","00","00","00"],
-  "bonus": "00",
-  "updated_at": ""
+  "round": "1324",
+  "draw_date": "2026-03-03",
+  "main": ["03","11","20","25","28"],
+  "bonus": "10",
+  "updated_at": "2026-03-03"
 }
