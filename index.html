@@ -470,8 +470,42 @@ const miniLotoPicks = [
 const numbers4 = ["1232","9941"];
 
 // 仮の抽選結果
-const miniResult = [3,11,20,22,30];
+async function checkResults(){
+
+const response = await fetch('./data/miniloto_latest.json');
+const data = await response.json();
+
+const miniResult = data.numbers;
+
 const numbers4Result = "5678";
+
+let text = "TAKARA 照合結果\n\n";
+
+miniLotoPicks.forEach((pick,i)=>{
+
+let match = pick.filter(n => miniResult.includes(n)).length;
+
+text += `ミニロト${i+1} → ${match}個一致\n`;
+
+});
+
+numbers4.forEach(n=>{
+
+if(n === numbers4Result){
+
+text += `ナンバーズ4 ${n} → 当選\n`;
+
+}else{
+
+text += `ナンバーズ4 ${n} → はずれ\n`;
+
+}
+
+});
+
+alert(text);
+
+}
 
 function checkResults(){
 
@@ -506,6 +540,7 @@ alert(text);
 </script>
 </body>
 </html>
+
 
 
 
