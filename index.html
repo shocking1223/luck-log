@@ -200,7 +200,7 @@
           <div class="sub">資産管理アプリ風 / 宝くじログ</div>
         </div>
       </div>
-      <button class="btn" id="btnCheck" onclick="checkResults()">CHECK</button>
+      <button class="btn" id="btnCheck">CHECK</button>
     </div>
 
     <div class="grid" id="viewHome">
@@ -361,27 +361,45 @@ if (n4Bold) n4Bold.textContent = `${n4[0]} / ${n4[1]}`;
   renderHome();
 
   // ====== CHECKボタン（まずは保存データを見せる）======
- document.getElementById('btnCheck').addEventListener('click', () => {
-  const mini = loadMini();
-  const input = prompt("ミニロト 当選番号を入力（5数字・スペース区切り）\n例：03 11 20 25 28");
-  if (input === null) return;
+ async function checkResults() {
+  try {
+    const response = await fetch('./data/miniloto_latest.json');
+    const data = await response.json();
 
-  const win = input.trim().split(/\s+/).map(x => x.padStart(2,"0"));
-  if (win.length !== 5) {
-    showToast("当選番号は5個！");
-    return;
+    const mini = loadMini();
+    const win = data.main; // ← numbers じゃなく main
+
+    if (!Array.isArray(win) || win.length !== 5) {
+      alert("JSONの抽選結果が読めない");
+      return;
+    }
+
+    const winSet = new Set(win.map(x => String(x).padStart(2, "0")));
+    const result = mini.map((line, i) => {
+      const nums = line.split(" ");
+      const hit = nums.filter(n => winSet.has(n)).length;
+      return `${i + 1}組 ${nums.join(" ")} → ${hit}個一致`;
+    });
+
+    const n4 = loadN4();
+    const numbers4Result = "5678";
+
+    const n4Result = n4.map(v =>
+      `${v} → ${v === numbers4Result ? "当選" : "はずれ"}`
+    );
+
+    alert(
+      "ミニロト当選番号\n" + win.join(" ") +
+      "\n\n結果\n" + result.join("\n") +
+      "\n\nナンバーズ4\n" + n4Result.join("\n")
+    );
+  } catch (e) {
+    alert("エラー: " + e.message);
+    console.error(e);
   }
+}
 
-  const winSet = new Set(win);
-
-  const result = mini.map((line, i) => {
-    const nums = line.split(" ");
-    const hit = nums.filter(n => winSet.has(n)).length;
-    return `${i+1}組 ${nums.join(" ")} → ${hit}個一致`;
-  });
-
-  alert("当選番号\n" + win.join(" ") + "\n\n結果\n" + result.join("\n"));
-});
+btnCheck.onclick = checkResults;
 
   // ====== 買い目編集（超シンプル：promptで編集）======
   // nav「買い目」を押したら、5行入力できるようにする（スペース区切り）
@@ -416,24 +434,20 @@ ${mini.join("\n")}
   }
 
   function editN4(){
-    const current = loadN4();
-    const v = prompt("Numbers4 固定番号（4桁）を入力", current);
-    if (v === null) return;
-    const s = String(v).trim();
-    if (!/^\d{4}$/.test(s)) { showToast("4桁の数字で！"); return; }
-    saveN4(s);
-    renderHome();
-    {
-  "game": "miniloto",
-  "round": "",
-  "draw_date": "",
-  "main": ["00","00","00","00","00"],
-  "bonus": "00",
-  "updated_at": ""
-}
-    showToast("N4を保存した");
+  const current = loadN4();
+  const v = prompt("Numbers4 固定番号（4桁）を入力", current[0]);
+  if (v === null) return;
+
+  const s = String(v).trim();
+  if (!/^\d{4}$/.test(s)) {
+    showToast("4桁の数字で！");
+    return;
   }
 
+  saveN4([s, current[1] || "9941"]);
+  renderHome();
+  showToast("N4を保存した");
+}
   // navの挙動（HOME/買い目/戦績）
   navBtns.forEach(btn => btn.addEventListener('click', () => {
     navBtns.forEach(b => b.classList.remove('active'));
@@ -457,60 +471,10 @@ ${mini.join("\n")}
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
   }
 </script>
-  <script>
 
-const miniLotoPicks = [
-[3,6,11,20,27],
-[3,12,16,25,31],
-[6,11,20,28,31],
-[3,16,25,27,28],
-[11,16,20,25,28]
-];
-
-const numbers4 = ["1232","9941"];
-
-// 仮の抽選結果
-async function checkResults(){
-
-const response = await fetch('./data/miniloto_latest.json');
-const data = await response.json();
-
-const miniResult = data.numbers;
-
-const numbers4Result = "5678";
-
-let text = "TAKARA 照合結果\n\n";
-
-miniLotoPicks.forEach((pick,i)=>{
-
-let match = pick.filter(n => miniResult.includes(n)).length;
-
-text += `ミニロト${i+1} → ${match}個一致\n`;
-
-});
-
-numbers4.forEach(n=>{
-
-if(n === numbers4Result){
-
-text += `ナンバーズ4 ${n} → 当選\n`;
-
-}else{
-
-text += `ナンバーズ4 ${n} → はずれ\n`;
-
-}
-
-});
-
-alert(text);
-
-}
-
-
-</script>
 </body>
 </html>
+
 
 
 
