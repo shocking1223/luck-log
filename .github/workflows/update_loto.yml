@@ -1,4 +1,4 @@
-name: Update MiniLoto Result
+name: Auto Update Loto
 
 on:
   schedule:
@@ -10,24 +10,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: リポジトリ取得
         uses: actions/checkout@v3
 
-      - name: Fetch MiniLoto result
+      - name: ミニロト結果更新
         run: |
           echo '{
             "game": "miniloto",
             "round": "AUTO",
-            "draw_date": "AUTO",
+            "draw_date": "'$(date +%Y-%m-%d)'",
             "main": ["03","11","20","25","28"],
             "bonus": "10",
             "updated_at": "'$(date +%Y-%m-%d)'"
           }' > data/miniloto_latest.json
 
-      - name: Commit update
+      - name: ナンバーズ4更新
+        run: |
+          echo '{
+            "game": "numbers4",
+            "result": "5678",
+            "updated_at": "'$(date +%Y-%m-%d)'"
+          }' > data/numbers4_latest.json
+
+      - name: Git更新
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add data/miniloto_latest.json
-          git commit -m "auto update miniloto result" || echo "no changes"
+          git add .
+          git commit -m "auto update loto result" || echo "no changes"
           git push
