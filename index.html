@@ -200,7 +200,7 @@
           <div class="sub">資産管理アプリ風 / 宝くじログ</div>
         </div>
       </div>
-      <button class="btn" id="btnCheck">CHECK</button>
+      <button class="btn" id="btnCheck" onclick="checkResults()">CHECK</button>
     </div>
 
     <div class="grid" id="viewHome">
@@ -457,8 +457,56 @@ ${mini.join("\n")}
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
   }
 </script>
+  <script>
+
+const miniLotoPicks = [
+[3,6,11,20,27],
+[3,12,16,25,31],
+[6,11,20,28,31],
+[3,16,25,27,28],
+[11,16,20,25,28]
+];
+
+const numbers4 = ["1232","9941"];
+
+// 仮の抽選結果
+const miniResult = [3,11,20,22,30];
+const numbers4Result = "5678";
+
+function checkResults(){
+
+let text = "TAKARA 照合結果\n\n";
+
+miniLotoPicks.forEach((pick,i)=>{
+
+let match = pick.filter(n => miniResult.includes(n)).length;
+
+text += `ミニロト${i+1} → ${match}個一致\n`;
+
+});
+
+numbers4.forEach(n=>{
+
+if(n === numbers4Result){
+
+text += `ナンバーズ4 ${n} → 当選\n`;
+
+}else{
+
+text += `ナンバーズ4 ${n} → はずれ\n`;
+
+}
+
+});
+
+alert(text);
+
+}
+
+</script>
 </body>
 </html>
+
 
 
 
