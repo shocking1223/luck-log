@@ -256,7 +256,19 @@
         <div class="toast" id="toast">チェック（デモ）: 次は抽選結果を自動取得して照合する。</div>
       </div>
     </div>
+    <div class="card" id="viewStats" style="display:none; margin-top:18px;">
+      <div class="row">
+        <div>
+          <div class="label">Stats</div>
+          <div class="value">戦績</div>
+        </div>
+        <div class="label">TAKARA LOG</div>
+      </div>
 
+      <div class="hint" id="statsBox" style="margin-top:14px; font-size:14px; line-height:1.9; color:#fff;">
+        まだ戦績はありません
+      </div>
+    </div>
     <div class="nav">
       <button class="active" id="navHome">HOME</button>
       <button id="navTickets">買い目</button>
@@ -277,6 +289,7 @@
 
   const KEY_MINI = "takara_mini5";
   const KEY_N4   = "takara_n4";
+  const KEY_STATS = "takara_stats";
 
   // ====== 既存HTMLから要素を拾う（この画面のまま活かす）======
   const toast = document.getElementById('toast');
@@ -359,34 +372,111 @@ if (n4Bold) n4Bold.textContent = `${n4[0]} / ${n4[1]}`;
   }
 
   renderHome();
+    function defaultStats(){
+    return {
+      mini: {
+        plays: 0,
+        best: 0,
+        hit2: 0,
+        hit3: 0,
+        hit4: 0,
+        hit5: 0,
+        invest: 0
+      },
+      n4: {
+        plays: 0,
+        hits: 0,
+        invest: 0
+      }
+    };
+  }
+
+  function loadStats(){
+    const raw = localStorage.getItem(KEY_STATS);
+    if (!raw) return defaultStats();
+    try {
+      const v = JSON.parse(raw);
+      return v || defaultStats();
+    } catch {
+      return defaultStats();
+    }
+  }
+
+  function saveStats(v){
+    localStorage.setItem(KEY_STATS, JSON.stringify(v));
+  }
+
+  function renderStats(){
+    const stats = loadStats();
+    const box = document.getElementById('statsBox');
+    if (!box) return;
+
+    box.innerHTML = `
+ミニロト<br>
+挑戦回数：${stats.mini.plays}回<br>
+最高一致：${stats.mini.best}個<br>
+2個一致：${stats.mini.hit2}回<br>
+3個一致：${stats.mini.hit3}回<br>
+4個一致：${stats.mini.hit4}回<br>
+5個一致：${stats.mini.hit5}回<br>
+投資額：${stats.mini.invest}円<br><br>
+
+ナンバーズ4<br>
+挑戦回数：${stats.n4.plays}回<br>
+的中回数：${stats.n4.hits}回<br>
+投資額：${stats.n4.invest}円
+    `;
+  }
+
+  renderStats();
 
   // ====== CHECKボタン（まずは保存データを見せる）======
- async function checkResults() {
+  async function checkResults() {
   try {
     const response = await fetch('./data/miniloto_latest.json');
     const data = await response.json();
 
     const mini = loadMini();
-    const win = data.main; // ← numbers じゃなく main
+    const win = data.main;
 
     if (!Array.isArray(win) || win.length !== 5) {
       alert("JSONの抽選結果が読めない");
       return;
     }
 
+    const stats = loadStats();
     const winSet = new Set(win.map(x => String(x).padStart(2, "0")));
+
     const result = mini.map((line, i) => {
       const nums = line.split(" ");
       const hit = nums.filter(n => winSet.has(n)).length;
+
+      if (hit > stats.mini.best) stats.mini.best = hit;
+      if (hit === 2) stats.mini.hit2 += 1;
+      if (hit === 3) stats.mini.hit3 += 1;
+      if (hit === 4) stats.mini.hit4 += 1;
+      if (hit === 5) stats.mini.hit5 += 1;
+
       return `${i + 1}組 ${nums.join(" ")} → ${hit}個一致`;
     });
+
+    stats.mini.plays += 1;
+    stats.mini.invest += 1000;
 
     const n4 = loadN4();
     const numbers4Result = "5678";
 
-    const n4Result = n4.map(v =>
-      `${v} → ${v === numbers4Result ? "当選" : "はずれ"}`
-    );
+    const n4Result = n4.map(v => {
+      const isHit = v === numbers4Result;
+      if (isHit) stats.n4.hits += 1;
+      return `${v} → ${isHit ? "当選" : "はずれ"}`;
+    });
+
+    stats.n4.plays += 1;
+    stats.n4.invest += 400;
+
+    saveStats(stats);
+    renderStats();
 
     alert(
       "ミニロト当選番号\n" + win.join(" ") +
@@ -398,7 +488,6 @@ if (n4Bold) n4Bold.textContent = `${n4[0]} / ${n4[1]}`;
     console.error(e);
   }
 }
-
 btnCheck.onclick = checkResults;
 
   // ====== 買い目編集（超シンプル：promptで編集）======
@@ -449,23 +538,31 @@ ${mini.join("\n")}
   showToast("N4を保存した");
 }
   // navの挙動（HOME/買い目/戦績）
-  navBtns.forEach(btn => btn.addEventListener('click', () => {
+    navBtns.forEach(btn => btn.addEventListener('click', () => {
     navBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
+    const home = document.getElementById('viewHome');
+    const statsView = document.getElementById('viewStats');
+
     if (btn.id === 'navTickets') {
-      // まずミニロト編集→続けてN4編集
       editTickets();
       editN4();
       return;
     }
+
     if (btn.id === 'navStats') {
-      showToast("戦績（次に実装）：総投資/総回収/回収率/当選回数");
+      home.style.display = 'none';
+      statsView.style.display = 'block';
+      renderStats();
       return;
     }
+
+    home.style.display = 'grid';
+    statsView.style.display = 'block';
+    statsView.style.display = 'none';
     showToast("HOME：保存した買い目が表示される");
   }));
-
   // Service Worker（あるなら）
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
@@ -474,6 +571,7 @@ ${mini.join("\n")}
 
 </body>
 </html>
+
 
 
 
