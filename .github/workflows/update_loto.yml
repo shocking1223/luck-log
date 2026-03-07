@@ -42,3 +42,4 @@ jobs:
           git add .
           git commit -m "auto update loto result" || echo "no changes"
           git push
+# retry
