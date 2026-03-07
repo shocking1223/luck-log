@@ -41,5 +41,5 @@ jobs:
           git config --global user.email "actions@github.com"
           git add .
           git commit -m "auto update loto result" || echo "no changes"
-          git push
+          git push origin HEAD:main
 # retry
